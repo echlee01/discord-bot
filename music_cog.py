@@ -109,7 +109,7 @@ class music_cog(commands.Cog):
                 if self.isplaying == False:
                     await self.play_music(ctx)
 
-    @commands.command(name="omg",alias=["o"] help="plays omg")
+    @commands.command(name="omg",alias=["o"], help="plays omg")
     async def omg(self, ctx, *args):
         query = 'https://www.youtube.com/watch?v=Xn4yAbA9cZw'
 
