@@ -19,7 +19,4 @@ with open("token.txt") as f:
 
 asyncio.run(setup(bot))
 
-music = bot.get_cog('music_cog')
-print(music)
-
 bot.run(token)

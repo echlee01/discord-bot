@@ -109,6 +109,24 @@ class music_cog(commands.Cog):
                 if self.isplaying == False:
                     await self.play_music(ctx)
 
+    @commands.command(name="omg", help="plays omg")
+    async def bruh(self, ctx, *args):
+        query = 'https://www.youtube.com/watch?v=Xn4yAbA9cZw'
+
+        vc = ctx.author.voice.channel
+        if vc is None:
+            await ctx.send("Connect to voice channel")
+        else:
+            song = self.search(query)
+            if song is True:
+                await ctx.send("Could not download")
+            else:
+                await ctx.send("Song added to the queue")
+                self.music_queue.append([song, vc])
+                
+                if self.isplaying == False:
+                    await self.play_music(ctx)
+
     @commands.command(name="leave", aliases=["disconnect", "l", "d"], help="Kick the bot from VC")
     async def dc(self, ctx):
         self.isplaying = False
@@ -121,3 +139,7 @@ class music_cog(commands.Cog):
             self.vc.stop()
         self.music_queue = []
         await ctx.send("Music queue cleared")
+    
+    @commands.command(name="list",aliases=["l"], help="list search")
+    async def list(self, ctx, *args): 
+        
