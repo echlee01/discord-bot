@@ -1,0 +1,1 @@
+This is a simple discord music bot created by Edwin Lee and Kenny Ung.
