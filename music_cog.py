@@ -109,8 +109,8 @@ class music_cog(commands.Cog):
                 if self.isplaying == False:
                     await self.play_music(ctx)
 
-    @commands.command(name="omg", help="plays omg")
-    async def bruh(self, ctx, *args):
+    @commands.command(name="omg",alias=["o"] help="plays omg")
+    async def omg(self, ctx, *args):
         query = 'https://www.youtube.com/watch?v=Xn4yAbA9cZw'
 
         vc = ctx.author.voice.channel
@@ -140,6 +140,6 @@ class music_cog(commands.Cog):
         self.music_queue = []
         await ctx.send("Music queue cleared")
     
-    @commands.command(name="list",aliases=["l"], help="list search")
-    async def list(self, ctx, *args): 
+    # @commands.command(name="list",aliases=["l"], help="list search")
+    # async def list(self, ctx, *args): 
         
