@@ -1,9 +1,9 @@
 from ast import alias
 import discord
 from discord.ext import commands
-import datetime
-import json
-
+import isodate
+import google.auth
+from googleapiclient.discovery import build
 from youtube_dl import YoutubeDL
 
 class music_cog(commands.Cog):
@@ -58,10 +58,7 @@ class music_cog(commands.Cog):
         else:
             self.isplaying = False
 
-    @commands.command(name="play",aliases=["p"], help="plays songs")
-    async def play(self, ctx, *args):
-        query = " ".join(args)
-
+    async def music_template(self, ctx, query):
         vc = ctx.author.voice.channel
         if vc is None:
             await ctx.send("Connect to voice channel")
@@ -70,11 +67,17 @@ class music_cog(commands.Cog):
             if song is True:
                 await ctx.send("Could not download")
             else:
-                await ctx.send(f"**{song['title']}** added to the queue")
+                await ctx.send("Song added to the queue")
                 self.music_queue.append([song, vc])
                 
                 if self.isplaying == False:
                     await self.play_music(ctx)
+
+    @commands.command(name="play",aliases=["p"], help="Plays requested song `play <query>`")
+    async def play(self, ctx, *args):
+        query = " ".join(args)
+
+        await self.music_template(ctx, query)
     
     @commands.command(name="queue", aliases=["q"], help="Displays the current songs in queue")
     async def queue(self, ctx):
@@ -93,43 +96,31 @@ class music_cog(commands.Cog):
             self.vc.stop()
             await self.play_music(ctx)
     
-    @commands.command(name="bruh",aliases=["b"], help="plays bruh")
-    async def bruh(self, ctx, *args):
+    @commands.command(name="bruh",aliases=["b"], help="Plays bruh")
+    async def bruh(self, ctx):
         query = 'https://www.youtube.com/watch?v=TApmI8YtYhc'
 
-        vc = ctx.author.voice.channel
-        if vc is None:
-            await ctx.send("Connect to voice channel")
-        else:
-            song = self.search(query)
-            if song is True:
-                await ctx.send("Could not download")
-            else:
-                await ctx.send("Song added to the queue")
-                self.music_queue.append([song, vc])
-                
-                if self.isplaying == False:
-                    await self.play_music(ctx)
+        await self.music_template(ctx, query)
 
-    @commands.command(name="omg",alias=["o"], help="plays omg")
-    async def omg(self, ctx, *args):
+    @commands.command(name="omg",aliases=["o"], help="Plays omg")
+    async def omg(self, ctx):
         query = 'https://www.youtube.com/watch?v=Xn4yAbA9cZw'
 
-        vc = ctx.author.voice.channel
-        if vc is None:
-            await ctx.send("Connect to voice channel")
-        else:
-            song = self.search(query)
-            if song is True:
-                await ctx.send("Could not download")
-            else:
-                await ctx.send("Song added to the queue")
-                self.music_queue.append([song, vc])
-                
-                if self.isplaying == False:
-                    await self.play_music(ctx)
+        await self.music_template(ctx, query)
 
-    @commands.command(name="leave", aliases=["disconnect", "l", "d"], help="Kick the bot from VC")
+    @commands.command(name="ninjasus", aliases=['ninja'], help="sussy ninja")
+    async def ninjaSus(self, ctx):
+        query = "UHcjhSjK0ws"
+
+        await self.music_template(ctx, query)
+
+    @commands.command(name="fnaf", aliases=['hor'], help="beatbox fnaf")
+    async def fnaf(self, ctx):
+        query = "https://www.youtube.com/watch?v=_CQ_ehoRfsE"
+        
+        await self.music_template(ctx, query)
+
+    @commands.command(name="leave", aliases=["disconnect", "l", "dc"], help="Kick the bot from VC")
     async def dc(self, ctx):
         self.isplaying = False
         self.ispaused = False
@@ -141,32 +132,8 @@ class music_cog(commands.Cog):
             self.vc.stop()
         self.music_queue = []
         await ctx.send("Music queue cleared")
-
-    # gives list from searches
-    async def search_list(self, item):
-        
-        with YoutubeDL(self.YDL_SEARCH_OPTIONS) as ydl:
-            try: 
-                info = ydl.extract_info("ytsearch5:%s" % item, download=False)['entries']
-                options = []
-                index = 0
-                
-                for i in info:
-                    title = str(index+1) + ". " + i['title']
-                    description = i['duration']
-                    option = {'title': title, 'description': description}
-                    url = i['formats'][0]['url']
-                    options += [{'source': url, 'option': option}]
-                    index += 1
-
-            except Exception: 
-                return False
-
-        return options
     
-    
-    
-    @commands.command(name="search",aliases=["f"], help="list search")
+    @commands.command(name="search",aliases=["f"], help="list search `search <query>`")
     async def list(self, ctx, *args): 
         query = " ".join(args)
 
@@ -174,15 +141,16 @@ class music_cog(commands.Cog):
         if vc is None:
             await ctx.send("Connect to voice channel")
         else:
-            info = await self.search_list(query)
+            # info = await self.search_list(query)
+            info = await self.yt_search(query)
             options = []
 
             if type(info) == type(True):
                 await ctx.send("Could not download song")
             
             for i in info:
-                duration = str(datetime.timedelta(seconds=i['option']['description']))
-                options.append(discord.SelectOption(label=i['option']['title'], description=duration))
+                description = i['description']
+                options.append(discord.SelectOption(label=i['title'], description=description))
 
             view=musicDropdownView(options=options)
             msg = await ctx.send("Pick a song", view=view)
@@ -190,41 +158,68 @@ class music_cog(commands.Cog):
             await view.wait()
 
             if view.index > (-1):
-                await ctx.send(f"**{info[view.index]['option']['title']}** added to the queue")
-
-                self.music_queue.append([info[view.index], vc])
+                await ctx.send(f"**{info[view.index]['title']}** added to the queue")
                 await msg.delete()
 
+                url = info[view.index]['source']
+                song = self.search(url)
+                self.music_queue.append([song, vc])
+
                 if self.isplaying == False:
-                    
                     await self.play_music(ctx)
+
             else:
                 await msg.delete()
 
-    @commands.command(name="cum")
+    @commands.command(name="test", help="test button")
     async def test(self, ctx):
-        view = cumView()
+        view = testView()
 
         msg = await ctx.send("Hello, World!", view=view)
 
         await view.wait()
+        await msg.delete()
 
-        if view.balls == 'empty':
-            print('Down bad 💀')
-        elif view.balls == 'full':
-            print('GIGACHAD')
-        else:
-            print('HUH')
+    async def yt_search(self, query):
+        api_key = ""
+        with open("api_key.txt") as f:
+            api_key = f.read() 
+        youtube = build('youtube','v3',developerKey = api_key)
+        request = youtube.search().list(q=query,part='id',type='video', maxResults=5) 
+        response = request.execute()
+        ids = []
+        
+        for id in response['items']:
+            vidId = id['id']['videoId']
+            ids.append(vidId) 
 
-class cumView(discord.ui.View):
+        id_str = ','.join(ids)
+        
+        req = youtube.videos().list(
+                part="snippet,contentDetails",
+                id=id_str
+            )
+        res = req.execute()
+        vids = []
+        index = 0
+
+        for item in res['items']:
+            duration = str(isodate.parse_duration(item['contentDetails']['duration']))
+            title = str(index+1) + ". " + item['snippet']['title']
+            vids += [{'source': item['id'], 'title': title, 'description': duration}]
+            index += 1
+        
+        return vids
+
+class testView(discord.ui.View):
     def __init__(self):
         super().__init__()
-        self.balls = 'full'
+        self.container = 'full'
 
-    @discord.ui.button(label='CUM')
+    @discord.ui.button(label='RELEASE')
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message('Down bad 💀')
-        self.balls = 'empty'
+        self.container = 'empty'
         self.stop()
 
 
@@ -232,10 +227,8 @@ class cumView(discord.ui.View):
     @discord.ui.button(label='ABSTAIN')
     async def abstain(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message('GIGACHAD')
-        self.balls = 'full'
+        self.container = 'full'
         self.stop()
-
-
 
 class musicDropdown(discord.ui.Select):
     def __init__(self, options):
