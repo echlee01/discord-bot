@@ -1,6 +1,8 @@
 from ast import alias
 import discord
 from discord.ext import commands
+import datetime
+import json
 
 from youtube_dl import YoutubeDL
 
@@ -12,6 +14,7 @@ class music_cog(commands.Cog):
         self.ispaused = False
         self.music_queue = []
         self.YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': 'True'}
+        self.YDL_SEARCH_OPTIONS = {'format': 'bestaudio', 'simulate': 'True', 'skip_download': 'True'}
         self.FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
         self.vc = None
 
@@ -19,7 +22,6 @@ class music_cog(commands.Cog):
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try: 
                 info = ydl.extract_info("ytsearch:%s" % item, download=False)['entries'][0]
-
             except Exception: 
                 return False
 
@@ -68,7 +70,7 @@ class music_cog(commands.Cog):
             if song is True:
                 await ctx.send("Could not download")
             else:
-                await ctx.send("Song added to the queue")
+                await ctx.send(f"**{song['title']}** added to the queue")
                 self.music_queue.append([song, vc])
                 
                 if self.isplaying == False:
@@ -139,7 +141,127 @@ class music_cog(commands.Cog):
             self.vc.stop()
         self.music_queue = []
         await ctx.send("Music queue cleared")
-    
-    # @commands.command(name="list",aliases=["l"], help="list search")
-    # async def list(self, ctx, *args): 
+
+    # gives list from searches
+    async def search_list(self, item):
         
+        with YoutubeDL(self.YDL_SEARCH_OPTIONS) as ydl:
+            try: 
+                info = ydl.extract_info("ytsearch5:%s" % item, download=False)['entries']
+                options = []
+                index = 0
+                
+                for i in info:
+                    title = str(index+1) + ". " + i['title']
+                    description = i['duration']
+                    option = {'title': title, 'description': description}
+                    url = i['formats'][0]['url']
+                    options += [{'source': url, 'option': option}]
+                    index += 1
+
+            except Exception: 
+                return False
+
+        return options
+    
+    
+    
+    @commands.command(name="search",aliases=["f"], help="list search")
+    async def list(self, ctx, *args): 
+        query = " ".join(args)
+
+        vc = ctx.author.voice.channel
+        if vc is None:
+            await ctx.send("Connect to voice channel")
+        else:
+            info = await self.search_list(query)
+            options = []
+
+            if type(info) == type(True):
+                await ctx.send("Could not download song")
+            
+            for i in info:
+                duration = str(datetime.timedelta(seconds=i['option']['description']))
+                options.append(discord.SelectOption(label=i['option']['title'], description=duration))
+
+            view=musicDropdownView(options=options)
+            msg = await ctx.send("Pick a song", view=view)
+
+            await view.wait()
+
+            if view.index > (-1):
+                await ctx.send(f"**{info[view.index]['option']['title']}** added to the queue")
+
+                self.music_queue.append([info[view.index], vc])
+                await msg.delete()
+
+                if self.isplaying == False:
+                    
+                    await self.play_music(ctx)
+            else:
+                await msg.delete()
+
+    @commands.command(name="cum")
+    async def test(self, ctx):
+        view = cumView()
+
+        msg = await ctx.send("Hello, World!", view=view)
+
+        await view.wait()
+
+        if view.balls == 'empty':
+            print('Down bad 💀')
+        elif view.balls == 'full':
+            print('GIGACHAD')
+        else:
+            print('HUH')
+
+class cumView(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        self.balls = 'full'
+
+    @discord.ui.button(label='CUM')
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message('Down bad 💀')
+        self.balls = 'empty'
+        self.stop()
+
+
+
+    @discord.ui.button(label='ABSTAIN')
+    async def abstain(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message('GIGACHAD')
+        self.balls = 'full'
+        self.stop()
+
+
+
+class musicDropdown(discord.ui.Select):
+    def __init__(self, options):
+        super().__init__(placeholder='Pick an audio file', min_values=1, max_values=1, options=options)
+        
+    async def callback(self, interaction: discord.Interaction):
+        assert self.view is not None
+        view: musicDropdownView = self.view
+
+        view.index = int(interaction.data['values'][0][:1]) - 1
+        view.stop()
+
+class buttonCancel(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Cancel", style=discord.ButtonStyle.danger)
+
+    async def callback(self, interaction: discord.Interaction):
+        assert self.view is not None
+        view: musicDropdownView = self.view
+
+        view.stop()
+
+class musicDropdownView(discord.ui.View):
+    def __init__(self, options):
+        self.index = -1
+        super().__init__()
+
+        self.add_item(musicDropdown(options))
+        self.add_item(buttonCancel())
