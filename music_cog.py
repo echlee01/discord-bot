@@ -119,6 +119,12 @@ class music_cog(commands.Cog):
         
         await self.music_template(ctx, query)
 
+    @commands.command(name="sus", aliases=[], help="stop posting about among us")
+    async def sus(self, ctx):
+        query = "https://www.youtube.com/watch?v=CB3d5L_yrCM"
+
+        await self.music_template(ctx, query)
+
     @commands.command(name="leave", aliases=["disconnect", "l", "dc"], help="Kick the bot from VC")
     async def dc(self, ctx):
         self.isplaying = False
