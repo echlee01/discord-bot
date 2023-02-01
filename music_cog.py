@@ -2,7 +2,6 @@ from ast import alias
 import discord
 from discord.ext import commands
 import isodate
-import google.auth
 from googleapiclient.discovery import build
 from youtube_dl import YoutubeDL
 
